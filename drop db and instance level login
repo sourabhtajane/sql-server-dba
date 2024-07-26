@@ -1,0 +1,65 @@
+param (
+    [string]$ServerInstance,  # SQL Server instance name, e.g., "ServerName\InstanceName"
+    [string]$AccountName      # Account name to drop
+)
+
+# Function to execute SQL commands
+function Execute-SQLCommand {
+    param (
+        [string]$ServerInstance,
+        [string]$Query
+    )
+
+    $connectionString = "Server=$ServerInstance;Integrated Security=True;"
+    $connection = New-Object System.Data.SqlClient.SqlConnection
+    $connection.ConnectionString = $connectionString
+    $command = $connection.CreateCommand()
+    $command.CommandText = $Query
+
+    try {
+        $connection.Open()
+        $command.ExecuteNonQuery()
+    } catch {
+        Write-Error "Failed to execute SQL command: $_"
+    } finally {
+        $connection.Close()
+    }
+}
+
+# Drop database level users
+function Drop-DatabaseUser {
+    param (
+        [string]$ServerInstance,
+        [string]$AccountName
+    )
+
+    $databasesQuery = "SELECT name FROM sys.databases WHERE state_desc = 'ONLINE'"
+
+    $databases = Invoke-Sqlcmd -ServerInstance $ServerInstance -Query $databasesQuery
+
+    foreach ($db in $databases) {
+        $database = $db.name
+        $dropUserQuery = "USE [$database]; IF EXISTS (SELECT * FROM sys.database_principals WHERE name = N'$AccountName') BEGIN DROP USER [$AccountName]; END"
+        Execute-SQLCommand -ServerInstance $ServerInstance -Query $dropUserQuery
+    }
+}
+
+# Drop instance level logins
+function Drop-InstanceLogin {
+    param (
+        [string]$ServerInstance,
+        [string]$AccountName
+    )
+
+    $dropLoginQuery = "IF EXISTS (SELECT * FROM sys.server_principals WHERE name = N'$AccountName') BEGIN DROP LOGIN [$AccountName]; END"
+    Execute-SQLCommand -ServerInstance $ServerInstance -Query $dropLoginQuery
+}
+
+# Main script execution
+try {
+    Drop-DatabaseUser -ServerInstance $ServerInstance -AccountName $AccountName
+    Drop-InstanceLogin -ServerInstance $ServerInstance -AccountName $AccountName
+    Write-Output "Account $AccountName has been dropped from all databases and the instance."
+} catch {
+    Write-Error "An error occurred: $_"
+}
