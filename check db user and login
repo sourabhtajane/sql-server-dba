@@ -1,0 +1,76 @@
+param (
+    [string]$ServerInstance,  # SQL Server instance name, e.g., "ServerName\InstanceName"
+    [string]$AccountName      # Account name to check
+)
+
+# Function to execute SQL commands and return results
+function Execute-SQLQuery {
+    param (
+        [string]$ServerInstance,
+        [string]$Query
+    )
+
+    $connectionString = "Server=$ServerInstance;Integrated Security=True;"
+    $connection = New-Object System.Data.SqlClient.SqlConnection
+    $connection.ConnectionString = $connectionString
+    $command = $connection.CreateCommand()
+    $command.CommandText = $Query
+
+    try {
+        $connection.Open()
+        $result = $command.ExecuteScalar()
+        return $result
+    } catch {
+        Write-Error "Failed to execute SQL query: $_"
+    } finally {
+        $connection.Close()
+    }
+}
+
+# Function to check if a database-level user exists
+function Check-DatabaseUser {
+    param (
+        [string]$ServerInstance,
+        [string]$AccountName
+    )
+
+    $databasesQuery = "SELECT name FROM sys.databases WHERE state_desc = 'ONLINE'"
+    $databases = Invoke-Sqlcmd -ServerInstance $ServerInstance -Query $databasesQuery
+
+    foreach ($db in $databases) {
+        $database = $db.name
+        $checkUserQuery = "USE [$database]; SELECT CASE WHEN EXISTS (SELECT * FROM sys.database_principals WHERE name = N'$AccountName') THEN 1 ELSE 0 END"
+        $userExists = Execute-SQLQuery -ServerInstance $ServerInstance -Query $checkUserQuery
+
+        if ($userExists -eq 1) {
+            Write-Output "User '$AccountName' exists in database '$database'."
+        } else {
+            Write-Output "User '$AccountName' does not exist in database '$database'."
+        }
+    }
+}
+
+# Function to check if an instance-level login exists
+function Check-InstanceLogin {
+    param (
+        [string]$ServerInstance,
+        [string]$AccountName
+    )
+
+    $checkLoginQuery = "SELECT CASE WHEN EXISTS (SELECT * FROM sys.server_principals WHERE name = N'$AccountName') THEN 1 ELSE 0 END"
+    $loginExists = Execute-SQLQuery -ServerInstance $ServerInstance -Query $checkLoginQuery
+
+    if ($loginExists -eq 1) {
+        Write-Output "Login '$AccountName' exists at the instance level."
+    } else {
+        Write-Output "Login '$AccountName' does not exist at the instance level."
+    }
+}
+
+# Main script execution
+try {
+    Check-DatabaseUser -ServerInstance $ServerInstance -AccountName $AccountName
+    Check-InstanceLogin -ServerInstance $ServerInstance -AccountName $AccountName
+} catch {
+    Write-Error "An error occurred: $_"
+}
