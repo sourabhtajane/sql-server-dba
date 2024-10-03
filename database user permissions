@@ -1,0 +1,33 @@
+WITH RolePermissions AS (
+    SELECT 
+        dp.name AS DatabaseUser,
+        dr.name AS DatabaseRole,
+        dp.type_desc AS UserType,
+        dp.principal_id AS UserID,
+        perm.class_desc,
+        OBJECT_NAME(perm.major_id) AS ObjectName,
+        perm.permission_name,
+        perm.state_desc AS PermissionState
+    FROM 
+        sys.database_principals AS dp
+    LEFT JOIN 
+        sys.database_role_members AS rm ON dp.principal_id = rm.member_principal_id
+    LEFT JOIN 
+        sys.database_principals AS dr ON rm.role_principal_id = dr.principal_id
+    LEFT JOIN 
+        sys.database_permissions AS perm ON dp.principal_id = perm.grantee_principal_id
+    WHERE 
+        dp.type IN ('S', 'U')  -- S = SQL user, U = Windows user
+)
+
+SELECT 
+    DatabaseUser,
+    DatabaseRole,
+    class_desc,
+    ObjectName,
+    permission_name,
+    PermissionState
+FROM 
+    RolePermissions
+ORDER BY 
+    DatabaseUser, DatabaseRole;
