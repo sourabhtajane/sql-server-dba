@@ -29,8 +29,37 @@ DECLARE @BackupFile NVARCHAR(260) = 'C:\Path\To\Your\BackupFile.bak'; -- Change 
 INSERT INTO #FileList
 EXEC ('RESTORE FILELISTONLY FROM DISK = ''' + @BackupFile + '''');
 
--- Step 3: Query the temporary table to view the output
-SELECT * FROM #FileList;
+-- Step 3: Modify PhysicalName to extract only the filename and add a specific path for certain types
+DECLARE @DataPath NVARCHAR(260) = 'C:\Specific\Data\Path\';
+DECLARE @LogPath NVARCHAR(260) = 'C:\Specific\Log\Path\';
+
+SELECT 
+    LogicalName,
+    CASE 
+        WHEN Type = 'D' THEN @DataPath + RIGHT(PhysicalName, CHARINDEX('\', REVERSE(PhysicalName)) - 1)
+        WHEN Type = 'L' THEN @LogPath + RIGHT(PhysicalName, CHARINDEX('\', REVERSE(PhysicalName)) - 1)
+        ELSE PhysicalName
+    END AS AdjustedPhysicalName,
+    Type,
+    FileGroupName,
+    Size,
+    MaxSize,
+    FileID,
+    CreateLSN,
+    DropLSN,
+    UniqueID,
+    ReadOnlyLSN,
+    ReadWriteLSN,
+    BackupSizeInBytes,
+    SourceBlockSize,
+    FileGroupID,
+    LogGroupGUID,
+    DifferentialBaseLSN,
+    DifferentialBaseGUID,
+    IsReadOnly,
+    IsPresent,
+    TDEThumbprint
+FROM #FileList;
 
 -- Step 4: Drop the temporary table (optional, as it will automatically drop when the session ends)
 -- DROP TABLE #FileList;
