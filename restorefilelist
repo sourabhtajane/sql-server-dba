@@ -1,0 +1,36 @@
+-- Step 1: Create a temporary table to hold the RESTORE FILELISTONLY output
+CREATE TABLE #FileList (
+    LogicalName NVARCHAR(128),
+    PhysicalName NVARCHAR(260),
+    Type CHAR(1),
+    FileGroupName NVARCHAR(128) NULL,
+    Size BIGINT,
+    MaxSize BIGINT,
+    FileID INT,
+    CreateLSN NUMERIC(25,0) NULL,
+    DropLSN NUMERIC(25,0) NULL,
+    UniqueID UNIQUEIDENTIFIER NULL,
+    ReadOnlyLSN NUMERIC(25,0) NULL,
+    ReadWriteLSN NUMERIC(25,0) NULL,
+    BackupSizeInBytes BIGINT,
+    SourceBlockSize INT,
+    FileGroupID INT,
+    LogGroupGUID UNIQUEIDENTIFIER NULL,
+    DifferentialBaseLSN NUMERIC(25,0) NULL,
+    DifferentialBaseGUID UNIQUEIDENTIFIER NULL,
+    IsReadOnly BIT,
+    IsPresent BIT,
+    TDEThumbprint VARBINARY(32) NULL
+);
+
+-- Step 2: Use RESTORE FILELISTONLY and insert the output into the temporary table
+DECLARE @BackupFile NVARCHAR(260) = 'C:\Path\To\Your\BackupFile.bak'; -- Change this to your backup file path
+
+INSERT INTO #FileList
+EXEC ('RESTORE FILELISTONLY FROM DISK = ''' + @BackupFile + '''');
+
+-- Step 3: Query the temporary table to view the output
+SELECT * FROM #FileList;
+
+-- Step 4: Drop the temporary table (optional, as it will automatically drop when the session ends)
+-- DROP TABLE #FileList;
