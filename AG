@@ -1,0 +1,30 @@
+SELECT 
+    drs.database_id,
+    drs.database_name,
+    drs.synchronization_state_desc AS SyncState,
+    drs.recovery_health_desc AS RecoveryHealth,
+    drs.redo_queue_size_in_bytes AS RedoQueueSize,
+    drs.redo_rate_in_kb_per_sec AS RedoRate
+FROM 
+    sys.dm_hadr_database_replica_states drs
+JOIN 
+    sys.availability_databases_cluster adc
+    ON drs.group_database_id = adc.group_database_id;
+
+
+SELECT 
+    redo_queue_size_in_bytes AS RedoQueueSize,
+    redo_rate_in_kb_per_sec AS RedoRate,
+    estimated_completion_time_in_seconds AS EstimatedRedoTime
+FROM 
+    sys.dm_hadr_database_replica_states;
+
+SELECT 
+    db_name(database_id) AS DatabaseName, 
+    file_id, 
+    num_of_reads, 
+    num_of_writes, 
+    io_stall_read_ms, 
+    io_stall_write_ms
+FROM 
+    sys.dm_io_virtual_file_stats(NULL, NULL);
