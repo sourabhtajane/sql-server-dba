@@ -1,0 +1,38 @@
+# Define the path to the instance list file
+$InstanceListPath = "C:\Path\To\InstanceList.txt"
+# Define the output CSV file path
+$OutputCsvPath = "C:\Path\To\SQL_Instance_Output.csv"
+
+# Read the SQL Server instances from the file
+$Instances = Get-Content $InstanceListPath
+
+# Initialize an array to store results
+$Results = @()
+
+# Loop through each SQL Server instance
+foreach ($Instance in $Instances) {
+    # Define the query
+    $Query = "select instant_file_initialization_enabled from sys.dm_server_services where servicename like 'SQL Server (%'"
+    
+    # Define the SQL command
+    $SqlCommand = @"
+        SELECT '$Instance' AS SQLInstance, instant_file_initialization_enabled
+        FROM sys.dm_server_services
+        WHERE servicename LIKE 'SQL Server (%'
+"@
+    
+    try {
+        # Execute the query and store the result
+        $Result = Invoke-Sqlcmd -ServerInstance $Instance -Query $SqlCommand -ErrorAction Stop
+        
+        # Append the result to the results array
+        $Results += $Result
+    } catch {
+        Write-Host "Failed to connect to SQL Server instance: $Instance" -ForegroundColor Red
+    }
+}
+
+# Export results to CSV
+$Results | Export-Csv -Path $OutputCsvPath -NoTypeInformation
+
+Write-Host "Output saved to $OutputCsvPath" -ForegroundColor Green
