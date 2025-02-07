@@ -1,0 +1,21 @@
+--On entire database with logging
+DECLARE @table_name NVARCHAR(MAX);
+
+DECLARE table_cursor CURSOR FOR
+SELECT QUOTENAME(s.name) + '.' + QUOTENAME(t.name) 
+FROM sys.tables t
+JOIN sys.schemas s ON t.schema_id = s.schema_id;
+
+OPEN table_cursor;
+
+FETCH NEXT FROM table_cursor INTO @table_name;
+
+WHILE @@FETCH_STATUS = 0
+BEGIN
+    PRINT 'Updating statistics on: ' + @table_name;
+    EXEC ('UPDATE STATISTICS ' + @table_name + ' WITH FULLSCAN');
+    FETCH NEXT FROM table_cursor INTO @table_name;
+END
+
+CLOSE table_cursor;
+DEALLOCATE table_cursor;
