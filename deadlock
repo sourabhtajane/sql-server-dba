@@ -1,0 +1,5 @@
+SELECT XEvent.query('(event/data/value/deadlock)[1]') AS DeadlockGraph
+FROM sys.fn_xe_file_target_read_file('system_health*.xel', NULL, NULL, NULL)
+CROSS APPLY XEvent.nodes('//event') AS XEvent(XEvent);
+
+SELECT * FROM sys.fn_xe_file_target_read_file('C:\Temp\Deadlocks*.xel', NULL, NULL, NULL);
