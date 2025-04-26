@@ -15,3 +15,23 @@ INNER JOIN
     dbo.sysschedules s ON js.schedule_id = s.schedule_id
 ORDER BY 
     j.name;
+
+
+--shared schedules
+
+USE msdb;
+GO
+
+SELECT 
+    s.name AS ScheduleName,
+    COUNT(js.job_id) AS AttachedJobs
+FROM 
+    dbo.sysschedules s
+LEFT JOIN 
+    dbo.sysjobschedules js ON s.schedule_id = js.schedule_id
+GROUP BY 
+    s.name
+HAVING 
+    COUNT(js.job_id) > 1
+ORDER BY 
+    AttachedJobs DESC;
