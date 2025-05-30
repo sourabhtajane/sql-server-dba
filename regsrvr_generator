@@ -1,0 +1,93 @@
+# Define a list of SQL Server instances
+$instances = @(
+    "localhost",
+    "ProdServer01",
+    "localhost",      # duplicate
+    "DEV-SQL",
+    "prodserver01"    # duplicate (case-insensitive)
+)
+
+# Remove duplicates (case-insensitive)
+$distinctInstances = $instances | Sort-Object -Unique -CaseSensitive:$false
+
+# Define XML header and namespace
+$xmlHeader = '<?xml version="1.0" encoding="utf-8"?>'
+$namespace = 'http://www.microsoft.com/sqlserver/RegisteredServers/2007/08'
+
+# Create base XML structure
+$doc = New-Object System.Xml.XmlDocument
+$doc.LoadXml("$xmlHeader<RegisteredServers xmlns='$namespace'></RegisteredServers>")
+
+$serverType = $doc.CreateElement("ServerType", $namespace)
+$doc.DocumentElement.AppendChild($serverType)
+
+$serverTypeID = $doc.CreateElement("ServerTypeID", $namespace)
+$serverTypeID.InnerText = "0"
+$serverType.AppendChild($serverTypeID)
+
+$serverTypeName = $doc.CreateElement("ServerTypeName", $namespace)
+$serverTypeName.InnerText = "Database Engine"
+$serverType.AppendChild($serverTypeName)
+
+$serverGroups = $doc.CreateElement("ServerGroups", $namespace)
+$serverType.AppendChild($serverGroups)
+
+$serverGroup = $doc.CreateElement("ServerGroup", $namespace)
+$serverGroups.AppendChild($serverGroup)
+
+$groupName = $doc.CreateElement("Name", $namespace)
+$groupName.InnerText = "PowerShell Registered Servers"
+$serverGroup.AppendChild($groupName)
+
+$groupDesc = $doc.CreateElement("Description", $namespace)
+$groupDesc.InnerText = "Generated using PowerShell"
+$serverGroup.AppendChild($groupDesc)
+
+$regServers = $doc.CreateElement("RegisteredServers", $namespace)
+$serverGroup.AppendChild($regServers)
+
+foreach ($instance in $distinctInstances) {
+    $regServer = $doc.CreateElement("RegisteredServer", $namespace)
+
+    $nameElem = $doc.CreateElement("Name", $namespace)
+    $nameElem.InnerText = $instance
+    $regServer.AppendChild($nameElem)
+
+    $serverNameElem = $doc.CreateElement("ServerName", $namespace)
+    $serverNameElem.InnerText = $instance
+    $regServer.AppendChild($serverNameElem)
+
+    $descElem = $doc.CreateElement("Description", $namespace)
+    $descElem.InnerText = "Added by PowerShell"
+    $regServer.AppendChild($descElem)
+
+    $colorElem = $doc.CreateElement("UseCustomConnectionColor", $namespace)
+    $colorElem.InnerText = "False"
+    $regServer.AppendChild($colorElem)
+
+    $connInfo = $doc.CreateElement("ConnectionInformation", $namespace)
+
+    $connServer = $doc.CreateElement("ServerName", $namespace)
+    $connServer.InnerText = $instance
+    $connInfo.AppendChild($connServer)
+
+    $authType = $doc.CreateElement("AuthenticationType", $namespace)
+    $authType.InnerText = "0"  # 0 = Windows Authentication
+    $connInfo.AppendChild($authType)
+
+    $encrypt = $doc.CreateElement("EncryptConnection", $namespace)
+    $encrypt.InnerText = "True"
+    $connInfo.AppendChild($encrypt)
+
+    $trustCert = $doc.CreateElement("TrustServerCertificate", $namespace)
+    $trustCert.InnerText = "True"
+    $connInfo.AppendChild($trustCert)
+
+    $regServer.AppendChild($connInfo)
+    $regServers.AppendChild($regServer)
+}
+
+# Output file
+$outputFile = "RegisteredServers.regsrvr"
+$doc.Save($outputFile)
+Write-Host "Registered server file generated: $outputFile"
