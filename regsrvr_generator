@@ -1,85 +1,82 @@
-# Define a list of SQL Server instances
 $instances = @(
     "localhost",
     "ProdServer01",
-    "localhost",      # duplicate
     "DEV-SQL",
-    "prodserver01"    # duplicate (case-insensitive)
+    "prodserver01"
 )
 
 # Remove duplicates (case-insensitive)
 $distinctInstances = $instances | Sort-Object -Unique -CaseSensitive:$false
 
-# Define XML header and namespace
-$xmlHeader = '<?xml version="1.0" encoding="utf-8"?>'
 $namespace = 'http://www.microsoft.com/sqlserver/RegisteredServers/2007/08'
 
-# Create base XML structure
-$doc = New-Object System.Xml.XmlDocument
-$doc.LoadXml("$xmlHeader<RegisteredServers xmlns='$namespace'></RegisteredServers>")
+# Create XML document
+$xml = New-Object System.Xml.XmlDocument
+$root = $xml.CreateElement("RegisteredServers", $namespace)
+$xml.AppendChild($root)
 
-$serverType = $doc.CreateElement("ServerType", $namespace)
-$doc.DocumentElement.AppendChild($serverType)
+$serverType = $xml.CreateElement("ServerType", $namespace)
+$root.AppendChild($serverType)
 
-$serverTypeID = $doc.CreateElement("ServerTypeID", $namespace)
+$serverTypeID = $xml.CreateElement("ServerTypeID", $namespace)
 $serverTypeID.InnerText = "0"
 $serverType.AppendChild($serverTypeID)
 
-$serverTypeName = $doc.CreateElement("ServerTypeName", $namespace)
+$serverTypeName = $xml.CreateElement("ServerTypeName", $namespace)
 $serverTypeName.InnerText = "Database Engine"
 $serverType.AppendChild($serverTypeName)
 
-$serverGroups = $doc.CreateElement("ServerGroups", $namespace)
+$serverGroups = $xml.CreateElement("ServerGroups", $namespace)
 $serverType.AppendChild($serverGroups)
 
-$serverGroup = $doc.CreateElement("ServerGroup", $namespace)
-$serverGroups.AppendChild($serverGroup)
+$group = $xml.CreateElement("ServerGroup", $namespace)
+$serverGroups.AppendChild($group)
 
-$groupName = $doc.CreateElement("Name", $namespace)
-$groupName.InnerText = "PowerShell Registered Servers"
-$serverGroup.AppendChild($groupName)
+$name = $xml.CreateElement("Name", $namespace)
+$name.InnerText = "PowerShell Registered Servers"
+$group.AppendChild($name)
 
-$groupDesc = $doc.CreateElement("Description", $namespace)
-$groupDesc.InnerText = "Generated using PowerShell"
-$serverGroup.AppendChild($groupDesc)
+$desc = $xml.CreateElement("Description", $namespace)
+$desc.InnerText = "Generated with PowerShell"
+$group.AppendChild($desc)
 
-$regServers = $doc.CreateElement("RegisteredServers", $namespace)
-$serverGroup.AppendChild($regServers)
+$regServers = $xml.CreateElement("RegisteredServers", $namespace)
+$group.AppendChild($regServers)
 
 foreach ($instance in $distinctInstances) {
-    $regServer = $doc.CreateElement("RegisteredServer", $namespace)
+    $regServer = $xml.CreateElement("RegisteredServer", $namespace)
 
-    $nameElem = $doc.CreateElement("Name", $namespace)
-    $nameElem.InnerText = $instance
-    $regServer.AppendChild($nameElem)
+    $regName = $xml.CreateElement("Name", $namespace)
+    $regName.InnerText = $instance
+    $regServer.AppendChild($regName)
 
-    $serverNameElem = $doc.CreateElement("ServerName", $namespace)
-    $serverNameElem.InnerText = $instance
-    $regServer.AppendChild($serverNameElem)
+    $serverName = $xml.CreateElement("ServerName", $namespace)
+    $serverName.InnerText = $instance
+    $regServer.AppendChild($serverName)
 
-    $descElem = $doc.CreateElement("Description", $namespace)
-    $descElem.InnerText = "Added by PowerShell"
-    $regServer.AppendChild($descElem)
+    $descNode = $xml.CreateElement("Description", $namespace)
+    $descNode.InnerText = "Added by PowerShell"
+    $regServer.AppendChild($descNode)
 
-    $colorElem = $doc.CreateElement("UseCustomConnectionColor", $namespace)
-    $colorElem.InnerText = "False"
-    $regServer.AppendChild($colorElem)
+    $useColor = $xml.CreateElement("UseCustomConnectionColor", $namespace)
+    $useColor.InnerText = "False"
+    $regServer.AppendChild($useColor)
 
-    $connInfo = $doc.CreateElement("ConnectionInformation", $namespace)
+    $connInfo = $xml.CreateElement("ConnectionInformation", $namespace)
 
-    $connServer = $doc.CreateElement("ServerName", $namespace)
-    $connServer.InnerText = $instance
-    $connInfo.AppendChild($connServer)
+    $connServerName = $xml.CreateElement("ServerName", $namespace)
+    $connServerName.InnerText = $instance
+    $connInfo.AppendChild($connServerName)
 
-    $authType = $doc.CreateElement("AuthenticationType", $namespace)
-    $authType.InnerText = "0"  # 0 = Windows Authentication
+    $authType = $xml.CreateElement("AuthenticationType", $namespace)
+    $authType.InnerText = "0"
     $connInfo.AppendChild($authType)
 
-    $encrypt = $doc.CreateElement("EncryptConnection", $namespace)
+    $encrypt = $xml.CreateElement("EncryptConnection", $namespace)
     $encrypt.InnerText = "True"
     $connInfo.AppendChild($encrypt)
 
-    $trustCert = $doc.CreateElement("TrustServerCertificate", $namespace)
+    $trustCert = $xml.CreateElement("TrustServerCertificate", $namespace)
     $trustCert.InnerText = "True"
     $connInfo.AppendChild($trustCert)
 
@@ -87,7 +84,11 @@ foreach ($instance in $distinctInstances) {
     $regServers.AppendChild($regServer)
 }
 
-# Output file
-$outputFile = "RegisteredServers.regsrvr"
-$doc.Save($outputFile)
-Write-Host "Registered server file generated: $outputFile"
+# Save properly encoded file
+$outputFile = "$env:USERPROFILE\Desktop\RegisteredServers.regsrvr"
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+$writer = New-Object System.IO.StreamWriter($outputFile, $false, $utf8NoBom)
+$xml.Save($writer)
+$writer.Close()
+
+Write-Host "`n✅ File saved to: $outputFile"
