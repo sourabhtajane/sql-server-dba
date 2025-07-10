@@ -1,0 +1,17 @@
+USE msdb;
+GO
+
+SELECT 
+    CONVERT(date, bs.backup_start_date) AS BackupDate,
+    SUM(bs.backup_size / 1024 / 1024) AS TotalLogBackupSize_MB
+FROM 
+    dbo.backupset bs
+JOIN 
+    dbo.backupmediafamily bmf ON bs.media_set_id = bmf.media_set_id
+WHERE 
+    bs.database_name = 'YourDatabaseName'  -- replace with your DB name
+    AND bs.type = 'L'                      -- 'L' = Log backup
+GROUP BY 
+    CONVERT(date, bs.backup_start_date)
+ORDER BY 
+    BackupDate DESC;
