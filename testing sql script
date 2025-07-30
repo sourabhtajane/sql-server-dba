@@ -1,0 +1,84 @@
+-- =============================================
+-- STORED PROCEDURE TEST RUNNER TEMPLATE
+-- Author: Your Name
+-- Date: 2025-07-30
+-- Purpose: Run a batch of stored proc tests with result reporting
+-- =============================================
+
+-- Optional: Temp table to track results
+IF OBJECT_ID('tempdb..#TestResults') IS NOT NULL DROP TABLE #TestResults;
+
+CREATE TABLE #TestResults (
+    TestName NVARCHAR(100),
+    Status NVARCHAR(10),
+    Message NVARCHAR(MAX),
+    ErrorNumber INT,
+    ErrorLine INT,
+    RunTime DATETIME DEFAULT GETDATE()
+);
+
+-- =============================================
+-- Test Case 1: sp_createdb with valid input
+-- =============================================
+BEGIN TRY
+    DECLARE @TestName NVARCHAR(100) = 'TC1: sp_createdb basic';
+
+    DECLARE @TestDB SYSNAME = 'TestDB_' + RIGHT('000' + CAST(ABS(CHECKSUM(NEWID())) % 1000 AS VARCHAR), 3);
+
+    -- Clean up
+    IF DB_ID(@TestDB) IS NOT NULL
+    BEGIN
+        ALTER DATABASE [@TestDB] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+        DROP DATABASE [@TestDB];
+    END;
+
+    -- Run test
+    EXEC dbo.sp_createdb
+        @dbname = @TestDB,
+        @datasize = 50,
+        @logsize = 20,
+        @datapath = 'D:\SQLData',
+        @logpath = 'D:\SQLLogs',
+        @createbackupjob = 0,
+        @createmaintenancejob = 1;
+
+    -- Assert DB created
+    IF DB_ID(@TestDB) IS NULL
+        THROW 51000, 'Database not created.', 1;
+
+    -- Optional: assert job created
+    IF NOT EXISTS (SELECT 1 FROM msdb.dbo.sysjobs WHERE name LIKE @TestDB + '%')
+        THROW 51001, 'Maintenance job not created.', 1;
+
+    -- Clean up
+    ALTER DATABASE [@TestDB] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+    DROP DATABASE [@TestDB];
+
+    -- Log success
+    INSERT INTO #TestResults (TestName, Status, Message)
+    VALUES (@TestName, 'PASS', 'Database and job created successfully');
+END TRY
+BEGIN CATCH
+    INSERT INTO #TestResults (TestName, Status, Message, ErrorNumber, ErrorLine)
+    VALUES (
+        'TC1: sp_createdb basic',
+        'FAIL',
+        ERROR_MESSAGE(),
+        ERROR_NUMBER(),
+        ERROR_LINE()
+    );
+END CATCH;
+
+-- =============================================
+-- Add more test cases below following the same structure
+-- =============================================
+
+-- =============================================
+-- Final Report
+-- =============================================
+PRINT '🧪 TEST RUN SUMMARY';
+SELECT * FROM #TestResults;
+
+-- Optional: Persist to a log table in your utility DB
+-- INSERT INTO UtilityDB.dbo.TestRunLog (TestName, Status, Message, ErrorNumber, ErrorLine, RunTime)
+-- SELECT * FROM #TestResults;
