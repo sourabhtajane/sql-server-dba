@@ -1,0 +1,43 @@
+# Define input and output files
+$inputFile = "C:\Path\To\input.csv"       # Replace with your CSV file path
+$outputFile = "C:\Path\To\output.txt"     # Output text file
+
+# Ensure output file exists
+if (!(Test-Path $outputFile)) {
+    New-Item -ItemType File -Path $outputFile -Force | Out-Null
+}
+
+# Read CSV input
+$entries = Import-Csv -Path $inputFile
+
+foreach ($entry in $entries) {
+    $server = $entry.SqlInstance
+    $database = $entry.Database
+    $user = $entry.DbUser
+
+    # Build SQL query
+    $query = @"
+USE [$database];
+SELECT @@SERVERNAME AS ServerName, DB_NAME() AS DatabaseName, *
+FROM sys.sysusers
+WHERE name = '$user';
+"@
+
+    # Run SQL command using sqlcmd
+    try {
+        $result = sqlcmd -S $server -d $database -Q $query -h -1 -W 2>&1
+
+        # Prepare output
+        $header = "----- $server | $database | $user -----`n"
+        $output = if ($result) {
+            $result -join "`n"
+        } else {
+            "User '$user' not found or no access."
+        }
+
+        # Append to output file
+        Add-Content -Path $outputFile -Value ($header + $output + "`n")
+    } catch {
+        Add-Content -Path $outputFile -Value ("----- $server | $database | $user -----`nError: $_`n")
+    }
+}
