@@ -1,0 +1,14 @@
+-- Check endpoint permissions for the HADR endpoint
+SELECT 
+    ep.name AS endpoint_name,
+    sp.name AS principal_name,
+    sp.type_desc AS principal_type,
+    perm.permission_name,
+    perm.state_desc
+FROM sys.server_permissions perm
+JOIN sys.endpoints ep
+    ON perm.major_id = ep.endpoint_id
+JOIN sys.server_principals sp
+    ON perm.grantee_principal_id = sp.principal_id
+WHERE ep.type_desc = 'DATABASE_MIRRORING'
+  AND perm.permission_name = 'CONNECT';
