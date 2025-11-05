@@ -1,0 +1,22 @@
+SELECT 
+    qsq.query_id,
+    qsq.object_id,
+    OBJECT_NAME(qsq.object_id) AS procedure_name,
+    qsq.query_sql_text_id,
+    qsqt.query_sql_text
+FROM sys.query_store_query AS qsq
+JOIN sys.query_store_query_text AS qsqt
+    ON qsq.query_sql_text_id = qsqt.query_sql_text_id
+WHERE OBJECT_NAME(qsq.object_id) = 'YourStoredProcedureName';
+
+
+SELECT 
+    qsq.query_id,
+    qsq.object_id,
+    OBJECT_NAME(qsq.object_id) AS procedure_name,
+    qsq.query_sql_text_id,
+    qsqt.query_sql_text
+FROM sys.query_store_query AS qsq
+JOIN sys.query_store_query_text AS qsqt
+    ON qsq.query_sql_text_id = qsqt.query_sql_text_id
+WHERE OBJECT_NAME(qsq.object_id) = 'YourStoredProcedureName';
