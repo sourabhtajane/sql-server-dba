@@ -11,12 +11,21 @@ WHERE OBJECT_NAME(qsq.object_id) = 'YourStoredProcedureName';
 
 
 SELECT 
-    qsq.query_id,
-    qsq.object_id,
     OBJECT_NAME(qsq.object_id) AS procedure_name,
-    qsq.query_sql_text_id,
-    qsqt.query_sql_text
+    qsq.query_id,
+    qsp.plan_id,
+    COUNT(*) AS execution_count,
+    ROUND(AVG(qsr.avg_duration/1000.0),2) AS avg_duration_ms,
+    ROUND(AVG(qsr.avg_cpu_time/1000.0),2) AS avg_cpu_ms,
+    AVG(qsr.avg_logical_io_reads) AS avg_logical_reads,
+    AVG(qsr.avg_logical_io_writes) AS avg_logical_writes,
+    MAX(qsr.last_execution_time) AS last_execution_time
 FROM sys.query_store_query AS qsq
-JOIN sys.query_store_query_text AS qsqt
-    ON qsq.query_sql_text_id = qsqt.query_sql_text_id
-WHERE OBJECT_NAME(qsq.object_id) = 'YourStoredProcedureName';
+JOIN sys.query_store_plan AS qsp
+    ON qsq.query_id = qsp.query_id
+JOIN sys.query_store_runtime_stats AS qsr
+    ON qsp.plan_id = qsr.plan_id
+WHERE OBJECT_NAME(qsq.object_id) = 'YourStoredProcedureName'
+GROUP BY qsq.object_id, qsq.query_id, qsp.plan_id
+ORDER BY avg_duration_ms DESC;
+
