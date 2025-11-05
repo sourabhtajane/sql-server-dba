@@ -29,3 +29,51 @@ WHERE OBJECT_NAME(qsq.object_id) = 'YourStoredProcedureName'
 GROUP BY qsq.object_id, qsq.query_id, qsp.plan_id
 ORDER BY avg_duration_ms DESC;
 
+
+
+SELECT 
+    OBJECT_NAME(qsq.object_id) AS procedure_name,
+    qsq.query_id,
+    COUNT(DISTINCT qsp.plan_id) AS plan_count,
+    STRING_AGG(CONVERT(varchar(20), qsp.plan_id), ', ') AS plan_ids
+FROM sys.query_store_query AS qsq
+JOIN sys.query_store_plan AS qsp
+    ON qsq.query_id = qsp.query_id
+WHERE OBJECT_NAME(qsq.object_id) = 'YourStoredProcedureName'
+GROUP BY qsq.query_id, qsq.object_id
+HAVING COUNT(DISTINCT qsp.plan_id) > 1;
+
+SELECT 
+    qsq.query_id,
+    qsp.plan_id,
+    qsp.is_forced_plan,
+    qsp.engine_version,
+    qsp.compatibility_level,
+    qsp.last_execution_time,
+    qsp.count_compiles,
+    qsp.avg_compile_duration,
+    TRY_CONVERT(XML, qsp.query_plan) AS query_plan_xml
+FROM sys.query_store_plan AS qsp
+JOIN sys.query_store_query AS qsq
+    ON qsq.query_id = qsp.query_id
+WHERE qsq.query_id = <your_query_id>;
+
+
+
+SELECT 
+    qsq.query_id,
+    qsp.plan_id,
+    MIN(qrs.first_execution_time) AS first_used,
+    MAX(qrs.last_execution_time) AS last_used,
+    COUNT(*) AS executions,
+    ROUND(AVG(qrs.avg_duration/1000.0),2) AS avg_duration_ms
+FROM sys.query_store_runtime_stats AS qrs
+JOIN sys.query_store_plan AS qsp
+    ON qrs.plan_id = qsp.plan_id
+JOIN sys.query_store_query AS qsq
+    ON qsq.query_id = qsp.query_id
+WHERE qsq.query_id = <your_query_id>
+GROUP BY qsq.query_id, qsp.plan_id
+ORDER BY first_used;
+
+
