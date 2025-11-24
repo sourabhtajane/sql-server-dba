@@ -1,0 +1,14 @@
+SELECT
+    t.name AS TableName,
+    i.name AS IndexName,
+    i.index_id,
+    ps.row_count,
+    (ps.reserved_page_count * 8) AS SizeKB,
+    (ps.reserved_page_count * 8) / 1024.0 AS SizeMB
+FROM sys.dm_db_partition_stats ps WITH (NOLOCK)
+JOIN sys.indexes i WITH (NOLOCK)
+    ON ps.object_id = i.object_id AND ps.index_id = i.index_id
+JOIN sys.tables t WITH (NOLOCK)
+    ON t.object_id = ps.object_id
+WHERE t.name = 'YourTableName'
+ORDER BY SizeMB DESC;
