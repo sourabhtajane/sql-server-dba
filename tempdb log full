@@ -1,0 +1,35 @@
+SELECT name, log_reuse_wait_desc 
+FROM sys.databases 
+WHERE name ='tempdb';
+
+---------------------
+
+DBCC OPENTRAN('tempdb');
+
+------------------
+SELECT 
+    at.transaction_id,
+    at.name,
+    at.transaction_state,
+    s.session_id,
+    s.host_name,
+    s.login_name,
+    r.status,
+    r.command,
+    t.text
+FROM sys.dm_tran_active_transactions at
+LEFT JOIN sys.dm_tran_session_transactions st ON at.transaction_id = st.transaction_id
+LEFT JOIN sys.dm_exec_sessions s ON st.session_id = s.session_id
+LEFT JOIN sys.dm_exec_requests r ON s.session_id = r.session_id
+OUTER APPLY sys.dm_exec_sql_text(r.sql_handle) t
+WHERE DB_NAME(r.database_id) = 'tempdb' OR st.session_id IS NOT NULL;
+
+--------------------------
+
+
+SELECT 
+    session_id,
+    internal_objects_alloc_page_count/128 AS InternalMB,
+    user_objects_alloc_page_count/128 AS UserMB
+FROM sys.dm_db_session_space_usage
+ORDER BY InternalMB DESC;
