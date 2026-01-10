@@ -1,0 +1,98 @@
+Import-Module SqlServer
+
+$InputCsv  = "C:\temp\input.csv"
+$OutputCsv = "C:\temp\output.csv"
+
+$results = @()
+$inputs  = Import-Csv $InputCsv
+
+foreach ($row in $inputs) {
+
+    $sqlInstance = $row.SQLInstance
+    $database    = $row.Database
+
+    $tsql = @"
+DECLARE @db SYSNAME = '$database';
+
+-- =====================================================
+-- 1. ALWAYS ON (Database-specific, Listener + Port)
+-- =====================================================
+IF SERVERPROPERTY('IsHadrEnabled') = 1
+AND EXISTS (
+    SELECT 1
+    FROM sys.availability_databases_cluster
+    WHERE database_name = @db
+)
+BEGIN
+    ;WITH AGInfo AS (
+        SELECT
+            ag.name     AS AGName,
+            al.dns_name AS ListenerName,
+            al.port     AS ListenerPort
+        FROM sys.availability_groups ag
+        JOIN sys.availability_group_listeners al
+            ON ag.group_id = al.group_id
+        JOIN sys.availability_databases_cluster adc
+            ON ag.group_id = adc.group_id
+        WHERE adc.database_name = @db
+    )
+    SELECT
+        '$sqlInstance' AS InputInstance,
+        @db            AS DatabaseName,
+        CONCAT(ListenerName, ':', ListenerPort) AS ProductionEndpoint,
+        'AlwaysOn'     AS DRStrategy;
+    RETURN;
+END
+
+-- =====================================================
+-- 2. STANDALONE ONLINE + WRITABLE
+-- =====================================================
+IF EXISTS (
+    SELECT 1
+    FROM sys.databases
+    WHERE name = @db
+      AND state_desc = 'ONLINE'
+      AND is_read_only = 0
+)
+BEGIN
+    SELECT
+        '$sqlInstance' AS InputInstance,
+        @db            AS DatabaseName,
+        '$sqlInstance' AS ProductionEndpoint,
+        'Standalone'   AS DRStrategy;
+    RETURN;
+END
+
+-- =====================================================
+-- 3. LOG SHIPPING / STANDBY / OFFLINE
+-- =====================================================
+SELECT
+    '$sqlInstance' AS InputInstance,
+    @db            AS DatabaseName,
+    hostname       AS ProductionEndpoint,
+    'LogShipping'  AS DRStrategy
+FROM lsa.ls.lso
+WHERE dbname = @db;
+"@
+
+    try {
+        $queryResult = Invoke-Sqlcmd `
+            -ServerInstance $sqlInstance `
+            -Database master `
+            -Query $tsql `
+            -ErrorAction Stop
+
+        $results += $queryResult
+    }
+    catch {
+        $results += [pscustomobject]@{
+            InputInstance      = $sqlInstance
+            DatabaseName       = $database
+            ProductionEndpoint = $null
+            DRStrategy         = 'ERROR'
+            ErrorMessage       = $_.Exception.Message
+        }
+    }
+}
+
+$results | Export-Csv $OutputCsv -NoTypeInformation
