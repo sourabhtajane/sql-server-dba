@@ -1,0 +1,98 @@
+Import-Module SqlServer -ErrorAction Stop
+
+# -------- Input / Output ----------
+$inputFile  = "C:\Temp\Input.csv"
+$outputFile = "C:\Temp\Output.csv"
+
+# -------- Function: Get Actual Production ----------
+function Get-ActualProduction {
+    param([string]$sqlInstance)
+
+    # Example: AG primary detection
+    $query = "
+    SELECT primary_replica
+    FROM sys.dm_hadr_availability_group_states ags
+    JOIN sys.availability_groups ag ON ag.group_id = ags.group_id
+    "
+
+    try {
+        $primary = Invoke-Sqlcmd -ServerInstance $sqlInstance -Database master -Query $query -ErrorAction Stop
+        if ($primary) { return $primary.primary_replica }
+    }
+    catch {}
+
+    # If not AG → assume standalone/log shipping
+    return $sqlInstance
+}
+
+# -------- Read Input ----------
+$rows = Import-Csv $inputFile
+$result = @()
+
+foreach ($row in $rows) {
+
+    $sqlInstance  = $row.sqlInstance
+    $database     = $row.database
+    $databaseUser = $row.databaseUser
+    $actualProduction = $null
+    $existBefore = $null
+    $existAfter  = $null
+    $errorMsg    = $null
+
+    try {
+
+        # Step 1: Determine actual production
+        $actualProduction = Get-ActualProduction -sqlInstance $sqlInstance
+
+        # Step 2: Check existence BEFORE
+        $checkQuery = @"
+SELECT COUNT(*) AS Cnt
+FROM sys.database_principals
+WHERE name = '$databaseUser'
+"@
+
+        $existBefore = (Invoke-Sqlcmd `
+            -ServerInstance $actualProduction `
+            -Database $database `
+            -Query $checkQuery `
+            -ErrorAction Stop).Cnt
+
+        # Convert to True/False
+        $existBefore = [bool]$existBefore
+
+        # Step 3: Drop user if exists
+        if ($existBefore) {
+
+            $dropQuery = "DROP USER [$databaseUser]"
+            Invoke-Sqlcmd `
+                -ServerInstance $actualProduction `
+                -Database $database `
+                -Query $dropQuery `
+                -ErrorAction Stop
+        }
+
+        # Step 4: Check existence AFTER
+        $existAfter = (Invoke-Sqlcmd `
+            -ServerInstance $actualProduction `
+            -Database $database `
+            -Query $checkQuery `
+            -ErrorAction Stop).Cnt
+
+        $existAfter = [bool]$existAfter
+    }
+    catch {
+        $errorMsg = $_.Exception.Message
+    }
+
+    [PSCustomObject]@{
+        sqlInstance      = $sqlInstance
+        database         = $database
+        databaseUser     = $databaseUser
+        actualProduction = $actualProduction
+        existBefore      = $existBefore
+        existAfter       = $existAfter
+        error            = $errorMsg
+    } | Export-Csv $outputFile -NoTypeInformation -Append
+}
+
+Write-Host "Completed. Output: $outputFile"
