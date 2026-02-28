@@ -1,0 +1,18 @@
+SELECT 
+    at.transaction_id,
+    at.name,
+    at.transaction_begin_time,
+    at.elapsed_time_seconds,
+    at.transaction_sequence_num,
+    at.first_snapshot_sequence_num,
+    at.max_version_chain_traversed,
+    s.session_id,
+    s.login_name,
+    s.host_name,
+    s.program_name
+FROM sys.dm_tran_active_snapshot_database_transactions at
+JOIN sys.dm_tran_session_transactions st 
+    ON at.transaction_id = st.transaction_id
+JOIN sys.dm_exec_sessions s 
+    ON st.session_id = s.session_id
+ORDER BY at.elapsed_time_seconds DESC;
