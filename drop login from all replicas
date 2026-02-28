@@ -1,0 +1,32 @@
+DECLARE @LoginName SYSNAME = 'TestLogin';   -- <<<<<< INPUT LOGIN HERE
+DECLARE @InstanceName SYSNAME;
+DECLARE @Cmd NVARCHAR(4000);
+
+-- Cursor for PROD / DR instances
+DECLARE InstanceCursor CURSOR FAST_FORWARD FOR
+SELECT InstanceName
+FROM dbo.InstanceList
+WHERE Environment IN ('PROD','DR');
+
+OPEN InstanceCursor;
+
+FETCH NEXT FROM InstanceCursor INTO @InstanceName;
+
+WHILE @@FETCH_STATUS = 0
+BEGIN
+    PRINT 'Processing instance: ' + @InstanceName;
+
+    -- Build sqlcmd command
+    SET @Cmd = 
+        'sqlcmd -S "' + @InstanceName + '" -E -Q "IF EXISTS (SELECT 1 FROM sys.server_principals WHERE name = ''' 
+        + @LoginName + ''') DROP LOGIN [' + @LoginName + ']"';
+
+    PRINT @Cmd;  -- For debugging
+
+    EXEC xp_cmdshell @Cmd;
+
+    FETCH NEXT FROM InstanceCursor INTO @InstanceName;
+END
+
+CLOSE InstanceCursor;
+DEALLOCATE InstanceCursor;
